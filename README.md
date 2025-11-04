@@ -1,1 +1,286 @@
-# resource_monitor
+# 资源监控系统 (Resource Monitor)
+
+一个分布式服务器资源监控系统，用于实时监控服务器池中多台服务器的CPU、GPU、内存和磁盘使用情况。
+
+## 功能特性
+
+- 📊 **实时资源监控**: 每5分钟自动收集CPU、GPU和内存使用率
+- 💾 **磁盘监控**: 每8小时检查 `/home` 和 `/data` 磁盘使用情况
+- 🌐 **Web界面**: 提供直观的Web仪表板展示所有指标
+- 🔄 **自动刷新**: 前端每10秒自动更新数据
+- 🖥️ **多服务器支持**: 可同时监控服务器池中的多台服务器
+- 📈 **历史数据**: 保存24小时的历史监控数据
+
+## 系统架构
+
+```
+┌─────────────────────────────────────────────────┐
+│           监控服务器 (Monitor Server)           │
+│                                                 │
+│  ┌──────────────┐      ┌──────────────────┐   │
+│  │ HTTP Server  │◄─────┤ Data Aggregator  │   │
+│  │  (Flask)     │      │                  │   │
+│  └──────────────┘      └────────▲─────────┘   │
+│         │                        │             │
+│         │              ┌─────────┴─────────┐   │
+│    ┌────▼────┐        │  Monitoring       │   │
+│    │ Frontend │        │  Service          │   │
+│    │ (HTML/JS)│        │  (Scheduler)      │   │
+│    └─────────┘        └─────────┬─────────┘   │
+│                                  │             │
+│                       ┌──────────┴──────────┐  │
+│                       │ Resource Collectors │  │
+│                       └──────────┬──────────┘  │
+└───────────────────────────────────┼─────────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    │               │               │
+                    ▼               ▼               ▼
+            ┌──────────┐    ┌──────────┐    ┌──────────┐
+            │ Server 1 │    │ Server 2 │    │ Server 3 │
+            │ (SSH)    │    │ (SSH)    │    │ (SSH)    │
+            └──────────┘    └──────────┘    └──────────┘
+```
+
+## 安装配置
+
+### 1. 系统要求
+
+- Python 3.7+
+- 对目标服务器的SSH访问权限
+- 目标服务器需要安装：
+  - Linux操作系统
+  - 基础命令工具（top, free, df等）
+  - nvidia-smi（如需GPU监控）
+
+### 2. 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. 配置服务器
+
+编辑 `config.json` 文件，配置需要监控的服务器：
+
+```json
+{
+  "servers": [
+    {
+      "name": "server1",
+      "host": "192.168.1.101",
+      "port": 22,
+      "username": "monitor",
+      "password": ""
+    },
+    {
+      "name": "server2",
+      "host": "192.168.1.102",
+      "port": 22,
+      "username": "monitor",
+      "password": ""
+    },
+    {
+      "name": "server3",
+      "host": "192.168.1.103",
+      "port": 22,
+      "username": "monitor",
+      "password": ""
+    }
+  ],
+  "monitoring": {
+    "resource_check_interval": 300,
+    "disk_check_interval": 28800
+  },
+  "http_server": {
+    "host": "0.0.0.0",
+    "port": 8080
+  }
+}
+```
+
+**配置说明**：
+- `servers`: 服务器列表
+  - `name`: 服务器名称（显示在仪表板上）
+  - `host`: 服务器IP地址或主机名
+  - `port`: SSH端口（默认22）
+  - `username`: SSH用户名
+  - `password`: SSH密码（为空时使用SSH密钥认证）
+- `monitoring`: 监控配置
+  - `resource_check_interval`: 资源检查间隔（秒），默认300秒（5分钟）
+  - `disk_check_interval`: 磁盘检查间隔（秒），默认28800秒（8小时）
+- `http_server`: HTTP服务器配置
+  - `host`: 监听地址（0.0.0.0表示所有接口）
+  - `port`: 监听端口
+
+### 4. SSH认证配置
+
+推荐使用SSH密钥认证：
+
+```bash
+# 生成SSH密钥
+ssh-keygen -t rsa -b 4096
+
+# 将公钥复制到目标服务器
+ssh-copy-id -i ~/.ssh/id_rsa.pub monitor@192.168.1.101
+```
+
+如果使用密码认证，在 `config.json` 中设置 `password` 字段。
+
+## 使用方法
+
+### 启动监控系统
+
+```bash
+python main.py [config.json]
+```
+
+或者：
+
+```bash
+python3 main.py
+```
+
+系统启动后会：
+1. 加载配置文件
+2. 初始化监控服务
+3. 启动定时任务（资源监控和磁盘监控）
+4. 启动HTTP服务器
+
+### 访问Web界面
+
+在浏览器中访问：
+
+```
+http://localhost:8080
+```
+
+或者使用服务器IP地址：
+
+```
+http://<监控服务器IP>:8080
+```
+
+## API接口
+
+系统提供以下REST API接口：
+
+### 1. 获取最新数据
+```
+GET /api/latest
+```
+
+返回所有服务器的最新监控数据。
+
+### 2. 获取历史数据
+```
+GET /api/history?server=<server_name>&hours=<hours>
+```
+
+参数：
+- `server`: 服务器名称（可选，默认为所有服务器）
+- `hours`: 历史数据时长（小时，默认为1）
+
+### 3. 获取统计摘要
+```
+GET /api/summary
+```
+
+返回所有服务器的统计摘要信息。
+
+### 4. 健康检查
+```
+GET /api/health
+```
+
+检查服务状态。
+
+## 监控指标
+
+### CPU监控
+- 实时CPU使用率百分比
+- 每5分钟更新
+
+### 内存监控
+- 总内存容量
+- 已使用内存
+- 内存使用率百分比
+- 每5分钟更新
+
+### GPU监控（需要nvidia-smi）
+- GPU索引和名称
+- GPU利用率
+- 显存使用情况
+- 每5分钟更新
+
+### 磁盘监控
+- `/home` 目录磁盘使用情况
+- `/data` 目录磁盘使用情况
+- 总容量、已使用、可用空间
+- 每8小时更新
+
+## 故障排除
+
+### 无法连接到服务器
+
+1. 检查SSH连接：
+```bash
+ssh username@hostname
+```
+
+2. 验证SSH密钥或密码配置
+3. 检查防火墙设置
+4. 确认目标服务器SSH服务正常运行
+
+### GPU信息无法获取
+
+1. 确认目标服务器安装了NVIDIA驱动和nvidia-smi：
+```bash
+nvidia-smi
+```
+
+2. 如果没有GPU，系统会正常显示其他指标
+
+### Web界面无法访问
+
+1. 检查HTTP服务是否正常运行
+2. 验证端口是否被占用：
+```bash
+netstat -tuln | grep 8080
+```
+
+3. 检查防火墙设置
+
+## 文件结构
+
+```
+resource_monitor/
+├── main.py                 # 主程序入口
+├── config.json             # 配置文件
+├── requirements.txt        # Python依赖
+├── resource_collector.py   # 资源收集模块
+├── data_aggregator.py      # 数据聚合模块
+├── monitoring_service.py   # 监控服务模块
+├── http_server.py          # HTTP服务器
+├── static/                 # 前端静态文件
+│   ├── index.html         # 主页面
+│   ├── style.css          # 样式表
+│   └── script.js          # JavaScript代码
+└── README.md              # 本文档
+```
+
+## 技术栈
+
+- **后端**: Python 3, Flask
+- **前端**: HTML5, CSS3, JavaScript (原生)
+- **SSH通信**: Paramiko
+- **任务调度**: APScheduler
+- **数据存储**: 内存存储（可扩展为数据库）
+
+## 许可证
+
+MIT License
+
+## 贡献
+
+欢迎提交Issue和Pull Request！

@@ -1,0 +1,33 @@
+{
+  "servers": [
+    {
+      "name": "server1",
+      "host": "192.168.1.101",
+      "port": 22,
+      "username": "monitor",
+      "password": ""
+    },
+    {
+      "name": "server2",
+      "host": "192.168.1.102",
+      "port": 22,
+      "username": "monitor",
+      "password": ""
+    },
+    {
+      "name": "server3",
+      "host": "192.168.1.103",
+      "port": 22,
+      "username": "monitor",
+      "password": ""
+    }
+  ],
+  "monitoring": {
+    "resource_check_interval": 300,
+    "disk_check_interval": 28800
+  },
+  "http_server": {
+    "host": "0.0.0.0",
+    "port": 8080
+  }
+}

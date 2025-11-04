@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资源监控面板 - Resource Monitor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖥️ 服务器资源监控面板</h1>
+            <div class="header-info">
+                <span class="last-update">最后更新: <span id="lastUpdate">--</span></span>
+                <span class="status-indicator">
+                    状态: <span id="systemStatus" class="status-badge">加载中...</span>
+                </span>
+            </div>
+        </header>
+
+        <div class="summary-section" id="summarySection">
+            <div class="summary-card">
+                <div class="summary-title">总服务器数</div>
+                <div class="summary-value" id="totalServers">--</div>
+            </div>
+            <div class="summary-card online">
+                <div class="summary-title">在线服务器</div>
+                <div class="summary-value" id="onlineServers">--</div>
+            </div>
+            <div class="summary-card offline">
+                <div class="summary-title">离线服务器</div>
+                <div class="summary-value" id="offlineServers">--</div>
+            </div>
+        </div>
+
+        <div class="servers-grid" id="serversGrid">
+            <!-- Server cards will be dynamically added here -->
+        </div>
+
+        <div class="error-message" id="errorMessage" style="display: none;"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

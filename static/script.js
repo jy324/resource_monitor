@@ -1,0 +1,275 @@
+// Resource Monitor Dashboard JavaScript
+
+const API_BASE = '/api';
+const REFRESH_INTERVAL = 10000; // 10 seconds
+
+// State management
+let refreshTimer = null;
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('Resource Monitor Dashboard initialized');
+    loadDashboard();
+    startAutoRefresh();
+});
+
+// Start auto-refresh
+function startAutoRefresh() {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+    }
+    refreshTimer = setInterval(loadDashboard, REFRESH_INTERVAL);
+}
+
+// Load dashboard data
+async function loadDashboard() {
+    try {
+        // Fetch latest data and summary in parallel
+        const [latestResponse, summaryResponse] = await Promise.all([
+            fetch(`${API_BASE}/latest`),
+            fetch(`${API_BASE}/summary`)
+        ]);
+
+        if (!latestResponse.ok || !summaryResponse.ok) {
+            throw new Error('Failed to fetch data');
+        }
+
+        const latestData = await latestResponse.json();
+        const summaryData = await summaryResponse.json();
+
+        // Update dashboard
+        updateSummary(summaryData);
+        updateServers(latestData);
+        updateLastUpdate();
+        updateSystemStatus('healthy');
+        hideError();
+
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+        showError(`无法加载数据: ${error.message}`);
+        updateSystemStatus('error');
+    }
+}
+
+// Update summary section
+function updateSummary(data) {
+    document.getElementById('totalServers').textContent = data.total_servers || 0;
+    document.getElementById('onlineServers').textContent = data.servers_online || 0;
+    document.getElementById('offlineServers').textContent = data.servers_offline || 0;
+}
+
+// Update servers grid
+function updateServers(data) {
+    const grid = document.getElementById('serversGrid');
+    
+    if (!data.servers || data.servers.length === 0) {
+        grid.innerHTML = '<div class="no-data">暂无服务器数据</div>';
+        return;
+    }
+
+    grid.innerHTML = '';
+    
+    data.servers.forEach(server => {
+        const card = createServerCard(server);
+        grid.appendChild(card);
+    });
+}
+
+// Create server card
+function createServerCard(server) {
+    const card = document.createElement('div');
+    const metrics = server.resource_metrics;
+    const disk = server.disk_metrics;
+    
+    const status = metrics?.status || 'unknown';
+    card.className = `server-card ${status === 'connected' ? 'online' : 'offline'}`;
+    
+    let html = `
+        <div class="server-header">
+            <div class="server-name">${escapeHtml(server.name || 'Unknown')}</div>
+            <div class="server-status ${status === 'connected' ? 'connected' : 'disconnected'}">
+                ${status === 'connected' ? '在线' : '离线'}
+            </div>
+        </div>
+    `;
+    
+    if (metrics && status === 'connected') {
+        html += `<div class="server-host">${escapeHtml(metrics.host || '')}</div>`;
+        
+        // CPU
+        if (metrics.cpu !== null && metrics.cpu !== undefined) {
+            const cpuLevel = getCpuLevel(metrics.cpu);
+            html += `
+                <div class="metric-section">
+                    <div class="metric-title">💻 CPU 使用率</div>
+                    <div class="metric-item">
+                        <span class="metric-label">当前使用率</span>
+                        <span class="metric-value">${metrics.cpu.toFixed(1)}%</span>
+                    </div>
+                    <div class="metric-bar">
+                        <div class="metric-bar-fill ${cpuLevel}" style="width: ${metrics.cpu}%"></div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Memory
+        if (metrics.memory) {
+            const memLevel = getUsageLevel(metrics.memory.percentage);
+            html += `
+                <div class="metric-section">
+                    <div class="metric-title">🧠 内存使用</div>
+                    <div class="metric-item">
+                        <span class="metric-label">已使用</span>
+                        <span class="metric-value">${formatMemory(metrics.memory.used_mb)} / ${formatMemory(metrics.memory.total_mb)}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">使用率</span>
+                        <span class="metric-value">${metrics.memory.percentage.toFixed(1)}%</span>
+                    </div>
+                    <div class="metric-bar">
+                        <div class="metric-bar-fill ${memLevel}" style="width: ${metrics.memory.percentage}%"></div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // GPU
+        if (metrics.gpu && metrics.gpu.length > 0) {
+            html += `<div class="metric-section"><div class="metric-title">🎮 GPU 状态</div>`;
+            metrics.gpu.forEach((gpu, index) => {
+                const gpuLevel = getUsageLevel(gpu.utilization);
+                html += `
+                    <div class="gpu-item">
+                        <div class="metric-item">
+                            <span class="metric-label">GPU ${gpu.index}: ${escapeHtml(gpu.name)}</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">利用率</span>
+                            <span class="metric-value">${gpu.utilization.toFixed(1)}%</span>
+                        </div>
+                        <div class="metric-bar">
+                            <div class="metric-bar-fill ${gpuLevel}" style="width: ${gpu.utilization}%"></div>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">显存</span>
+                            <span class="metric-value">${formatMemory(gpu.memory_used_mb)} / ${formatMemory(gpu.memory_total_mb)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
+    }
+    
+    // Disk usage
+    if (disk && disk.disk && Object.keys(disk.disk).length > 0) {
+        html += `<div class="metric-section"><div class="metric-title">💾 磁盘使用</div>`;
+        Object.entries(disk.disk).forEach(([path, info]) => {
+            if (info) {
+                const diskLevel = getUsageLevel(info.percentage);
+                html += `
+                    <div class="metric-item">
+                        <span class="metric-label"><span class="disk-path">${escapeHtml(path)}</span></span>
+                        <span class="metric-value">${info.percentage.toFixed(1)}%</span>
+                    </div>
+                    <div class="metric-bar">
+                        <div class="metric-bar-fill ${diskLevel}" style="width: ${info.percentage}%"></div>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">已使用 / 总容量</span>
+                        <span class="metric-value">${formatDisk(info.used_mb)} / ${formatDisk(info.total_mb)}</span>
+                    </div>
+                `;
+            }
+        });
+        html += `</div>`;
+    }
+    
+    // Timestamp
+    const timestamp = metrics?.timestamp || disk?.timestamp;
+    if (timestamp) {
+        html += `<div class="timestamp">更新时间: ${formatTimestamp(timestamp)}</div>`;
+    }
+    
+    card.innerHTML = html;
+    return card;
+}
+
+// Utility functions
+function formatMemory(mb) {
+    if (mb >= 1024) {
+        return `${(mb / 1024).toFixed(1)} GB`;
+    }
+    return `${mb.toFixed(0)} MB`;
+}
+
+function formatDisk(mb) {
+    if (mb >= 1024 * 1024) {
+        return `${(mb / (1024 * 1024)).toFixed(1)} TB`;
+    } else if (mb >= 1024) {
+        return `${(mb / 1024).toFixed(1)} GB`;
+    }
+    return `${mb.toFixed(0)} MB`;
+}
+
+function formatTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+function getCpuLevel(value) {
+    if (value > 80) return 'high';
+    if (value > 50) return 'medium';
+    return '';
+}
+
+function getUsageLevel(value) {
+    if (value > 85) return 'high';
+    if (value > 60) return 'medium';
+    return '';
+}
+
+function updateLastUpdate() {
+    const now = new Date();
+    document.getElementById('lastUpdate').textContent = now.toLocaleString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+function updateSystemStatus(status) {
+    const badge = document.getElementById('systemStatus');
+    badge.className = `status-badge ${status}`;
+    badge.textContent = status === 'healthy' ? '正常运行' : '错误';
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+function hideError() {
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.style.display = 'none';
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
