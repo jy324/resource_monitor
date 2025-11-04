@@ -1,11 +1,15 @@
 """
 Resource monitoring collector module.
 Connects to remote servers and collects CPU, GPU, memory, and disk usage.
+Supports both remote (SSH) and local (psutil) monitoring.
 """
 
 import paramiko
 import json
 import logging
+import subprocess
+import socket
+import psutil
 from typing import Dict, List, Optional
 from datetime import datetime
 
@@ -14,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceCollector:
-    """Collects resource metrics from remote servers via SSH."""
+    """Collects resource metrics from remote servers via SSH or locally via psutil."""
     
     def __init__(self, server_config: Dict):
         """
@@ -29,10 +33,57 @@ class ResourceCollector:
         self.username = server_config['username']
         self.password = server_config.get('password', '')
         self.ssh_client = None
+        self.is_local = self._is_local_host()
+        
+        if self.is_local:
+            logger.info(f"{self.name} detected as local server, will use direct monitoring")
+    
+    def _is_local_host(self) -> bool:
+        """
+        Determine if the configured host is the local machine.
+        
+        Returns:
+            True if host is local, False otherwise
+        """
+        local_hosts = ['localhost', '127.0.0.1', '::1']
+        
+        # Check if host is in common local host names
+        if self.host in local_hosts:
+            return True
+        
+        # Check if host matches local hostname
+        try:
+            local_hostname = socket.gethostname()
+            if self.host == local_hostname:
+                return True
+            
+            # Also check FQDN
+            local_fqdn = socket.getfqdn()
+            if self.host == local_fqdn:
+                return True
+            
+            # Check if host resolves to a local IP
+            try:
+                host_ip = socket.gethostbyname(self.host)
+                local_ips = [socket.gethostbyname(local_hostname)]
+                # Add all local interface IPs
+                for interface, addrs in psutil.net_if_addrs().items():
+                    for addr in addrs:
+                        if addr.family == socket.AF_INET:
+                            local_ips.append(addr.address)
+                
+                if host_ip in local_ips:
+                    return True
+            except:
+                pass
+        except:
+            pass
+        
+        return False
         
     def connect(self) -> bool:
         """
-        Establish SSH connection to the remote server.
+        Establish SSH connection to the remote server (not needed for local monitoring).
         
         Returns:
             True if connection successful, False otherwise
@@ -42,7 +93,13 @@ class ResourceCollector:
             - If password is empty/not provided, uses SSH key authentication (default)
             - This uses AutoAddPolicy for host key acceptance. In production,
               consider using known_hosts file with RejectPolicy for better security.
+            - Local servers don't need SSH connection
         """
+        # Local server doesn't need SSH connection
+        if self.is_local:
+            logger.info(f"{self.name} is local, skipping SSH connection")
+            return True
+        
         try:
             self.ssh_client = paramiko.SSHClient()
             # Load system host keys for security (if available)
@@ -85,9 +142,9 @@ class ResourceCollector:
             self.ssh_client.close()
             logger.info(f"Disconnected from {self.name}")
     
-    def _execute_command(self, command: str) -> Optional[str]:
+    def _execute_command_local(self, command: str) -> Optional[str]:
         """
-        Execute a command on the remote server.
+        Execute a command locally using subprocess.
         
         Args:
             command: Command to execute
@@ -95,6 +152,38 @@ class ResourceCollector:
         Returns:
             Command output or None if execution failed
         """
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                return result.stdout.strip()
+            else:
+                if result.stderr:
+                    logger.warning(f"Command error on {self.name}: {result.stderr.strip()}")
+                return result.stdout.strip() if result.stdout else None
+        except Exception as e:
+            logger.error(f"Failed to execute local command on {self.name}: {e}")
+            return None
+    
+    def _execute_command(self, command: str) -> Optional[str]:
+        """
+        Execute a command on the server (local or remote).
+        
+        Args:
+            command: Command to execute
+            
+        Returns:
+            Command output or None if execution failed
+        """
+        if self.is_local:
+            return self._execute_command_local(command)
+        
         try:
             stdin, stdout, stderr = self.ssh_client.exec_command(command)
             output = stdout.read().decode('utf-8').strip()
@@ -109,6 +198,84 @@ class ResourceCollector:
             logger.error(f"Failed to execute command on {self.name}: {e}")
             return None
     
+    def _collect_cpu_usage_local(self) -> Optional[float]:
+        """Collect CPU usage locally using psutil."""
+        try:
+            # Get CPU percentage (1 second interval for accuracy)
+            cpu_percent = psutil.cpu_percent(interval=1)
+            return cpu_percent
+        except Exception as e:
+            logger.error(f"Failed to get local CPU usage: {e}")
+            return None
+    
+    def _collect_memory_usage_local(self) -> Optional[Dict[str, float]]:
+        """Collect memory usage locally using psutil."""
+        try:
+            mem = psutil.virtual_memory()
+            return {
+                'total_mb': mem.total / (1024 * 1024),
+                'used_mb': mem.used / (1024 * 1024),
+                'percentage': round(mem.percent, 2)
+            }
+        except Exception as e:
+            logger.error(f"Failed to get local memory usage: {e}")
+            return None
+    
+    def _collect_gpu_usage_local(self) -> Optional[List[Dict]]:
+        """Collect GPU usage locally using nvidia-smi."""
+        try:
+            # Check if nvidia-smi is available
+            result = subprocess.run(['which', 'nvidia-smi'], capture_output=True)
+            if result.returncode != 0:
+                logger.info(f"No GPU found on {self.name}")
+                return []
+            
+            # Get GPU information
+            command = "nvidia-smi --query-gpu=index,name,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits"
+            output = self._execute_command_local(command)
+            
+            if output:
+                gpus = []
+                for line in output.split('\n'):
+                    if line.strip():
+                        try:
+                            parts = [p.strip() for p in line.split(',')]
+                            if len(parts) >= 5:
+                                gpus.append({
+                                    'index': int(parts[0]),
+                                    'name': parts[1],
+                                    'utilization': float(parts[2]),
+                                    'memory_used_mb': float(parts[3]),
+                                    'memory_total_mb': float(parts[4])
+                                })
+                        except (ValueError, IndexError) as e:
+                            logger.error(f"Failed to parse GPU data: {e}")
+                
+                return gpus
+        except Exception as e:
+            logger.error(f"Failed to get local GPU usage: {e}")
+        
+        return []
+    
+    def _collect_disk_usage_local(self, paths: List[str] = ['/home', '/data']) -> Dict[str, Optional[Dict]]:
+        """Collect disk usage locally using psutil."""
+        disk_info = {}
+        
+        for path in paths:
+            try:
+                usage = psutil.disk_usage(path)
+                disk_info[path] = {
+                    'total_mb': int(usage.total / (1024 * 1024)),
+                    'used_mb': int(usage.used / (1024 * 1024)),
+                    'available_mb': int(usage.free / (1024 * 1024)),
+                    'percentage': round(usage.percent, 1)
+                }
+            except Exception as e:
+                logger.warning(f"Failed to get disk usage for {path}: {e}")
+                disk_info[path] = None
+        
+        return disk_info
+    
     def collect_cpu_usage(self) -> Optional[float]:
         """
         Collect CPU usage percentage.
@@ -116,6 +283,9 @@ class ResourceCollector:
         Returns:
             CPU usage as a float percentage or None if collection failed
         """
+        if self.is_local:
+            return self._collect_cpu_usage_local()
+        
         # Using top command to get CPU usage
         command = "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1"
         output = self._execute_command(command)
@@ -135,6 +305,9 @@ class ResourceCollector:
         Returns:
             Dictionary with total, used, and percentage or None if collection failed
         """
+        if self.is_local:
+            return self._collect_memory_usage_local()
+        
         command = "free -m | grep Mem | awk '{print $2,$3}'"
         output = self._execute_command(command)
         
@@ -159,6 +332,8 @@ class ResourceCollector:
         Returns:
             List of GPU information dictionaries or None if no GPU or collection failed
         """
+        if self.is_local:
+            return self._collect_gpu_usage_local()
         # Check if nvidia-smi is available
         command = "which nvidia-smi"
         if not self._execute_command(command):
@@ -200,6 +375,9 @@ class ResourceCollector:
         Returns:
             Dictionary mapping paths to their usage information
         """
+        if self.is_local:
+            return self._collect_disk_usage_local(paths)
+        
         disk_info = {}
         
         for path in paths:
@@ -231,14 +409,16 @@ class ResourceCollector:
         Returns:
             Dictionary containing all collected metrics
         """
-        if not self.ssh_client or not self.ssh_client.get_transport() or not self.ssh_client.get_transport().is_active():
-            if not self.connect():
-                return {
-                    'server': self.name,
-                    'timestamp': datetime.now().isoformat(),
-                    'status': 'disconnected',
-                    'error': 'Failed to connect to server'
-                }
+        # For local monitoring, we don't need SSH connection
+        if not self.is_local:
+            if not self.ssh_client or not self.ssh_client.get_transport() or not self.ssh_client.get_transport().is_active():
+                if not self.connect():
+                    return {
+                        'server': self.name,
+                        'timestamp': datetime.now().isoformat(),
+                        'status': 'disconnected',
+                        'error': 'Failed to connect to server'
+                    }
         
         data = {
             'server': self.name,
@@ -259,14 +439,16 @@ class ResourceCollector:
         Returns:
             Dictionary containing disk usage metrics
         """
-        if not self.ssh_client or not self.ssh_client.get_transport() or not self.ssh_client.get_transport().is_active():
-            if not self.connect():
-                return {
-                    'server': self.name,
-                    'timestamp': datetime.now().isoformat(),
-                    'status': 'disconnected',
-                    'error': 'Failed to connect to server'
-                }
+        # For local monitoring, we don't need SSH connection
+        if not self.is_local:
+            if not self.ssh_client or not self.ssh_client.get_transport() or not self.ssh_client.get_transport().is_active():
+                if not self.connect():
+                    return {
+                        'server': self.name,
+                        'timestamp': datetime.now().isoformat(),
+                        'status': 'disconnected',
+                        'error': 'Failed to connect to server'
+                    }
         
         data = {
             'server': self.name,
