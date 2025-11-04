@@ -46,7 +46,7 @@ def get_latest():
         return jsonify(data)
     except Exception as e:
         logger.error(f"Error getting latest data: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to retrieve latest data'}), 500
 
 
 @app.route('/api/history')
@@ -72,7 +72,7 @@ def get_history():
         return jsonify(data)
     except Exception as e:
         logger.error(f"Error getting historical data: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to retrieve historical data'}), 500
 
 
 @app.route('/api/summary')
@@ -88,7 +88,7 @@ def get_summary():
         return jsonify(data)
     except Exception as e:
         logger.error(f"Error getting summary data: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to retrieve summary data'}), 500
 
 
 @app.route('/api/health')
