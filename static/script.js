@@ -1,5 +1,6 @@
 // Resource Monitor Dashboard JavaScript
 
+// API configuration - uses relative path for flexibility
 const API_BASE = '/api';
 const REFRESH_INTERVAL = 10000; // 10 seconds
 

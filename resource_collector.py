@@ -36,9 +36,20 @@ class ResourceCollector:
         
         Returns:
             True if connection successful, False otherwise
+        
+        Note:
+            This uses AutoAddPolicy for host key acceptance. In production,
+            consider using known_hosts file with RejectPolicy for better security.
         """
         try:
             self.ssh_client = paramiko.SSHClient()
+            # Load system host keys for security (if available)
+            try:
+                self.ssh_client.load_system_host_keys()
+            except:
+                pass
+            # AutoAddPolicy: accepts unknown hosts (convenient but less secure)
+            # For production, consider: paramiko.RejectPolicy() with proper known_hosts
             self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
             # Try password authentication first, then key-based
