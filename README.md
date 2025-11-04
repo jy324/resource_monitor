@@ -105,7 +105,10 @@ pip install -r requirements.txt
   - `host`: 服务器IP地址或主机名
   - `port`: SSH端口（默认22）
   - `username`: SSH用户名
-  - `password`: SSH密码（为空时使用SSH密钥认证）
+  - `password`: SSH密码（**可选**）
+    - 如果提供密码（非空字符串），使用密码认证
+    - 如果为空字符串 `""`，使用SSH密钥认证（推荐）
+    - **不需要同时配置密码和SSH密钥**，选择其中一种即可
 - `monitoring`: 监控配置
   - `resource_check_interval`: 资源检查间隔（秒），默认300秒（5分钟）
   - `disk_check_interval`: 磁盘检查间隔（秒），默认28800秒（8小时）
@@ -115,17 +118,57 @@ pip install -r requirements.txt
 
 ### 4. SSH认证配置
 
-推荐使用SSH密钥认证：
+系统支持两种认证方式，**选择其中一种即可**：
+
+#### 方式一：SSH密钥认证（推荐）
+
+在 `config.json` 中将 `password` 设为空字符串 `""`，系统将自动使用SSH密钥：
 
 ```bash
-# 生成SSH密钥
+# 生成SSH密钥（如果还没有）
 ssh-keygen -t rsa -b 4096
 
 # 将公钥复制到目标服务器
 ssh-copy-id -i ~/.ssh/id_rsa.pub monitor@192.168.1.101
+
+# 测试连接
+ssh monitor@192.168.1.101
 ```
 
-如果使用密码认证，在 `config.json` 中设置 `password` 字段。
+配置示例：
+```json
+{
+  "servers": [
+    {
+      "name": "server1",
+      "host": "192.168.1.101",
+      "port": 22,
+      "username": "monitor",
+      "password": ""
+    }
+  ]
+}
+```
+
+#### 方式二：密码认证
+
+在 `config.json` 中直接设置 `password` 字段：
+
+```json
+{
+  "servers": [
+    {
+      "name": "server1",
+      "host": "192.168.1.101",
+      "port": 22,
+      "username": "monitor",
+      "password": "your_password_here"
+    }
+  ]
+}
+```
+
+**注意**：密码认证安全性较低，不建议在生产环境使用。
 
 ## 使用方法
 

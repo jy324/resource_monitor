@@ -14,7 +14,11 @@ pip install -r requirements.txt
 cp config.example.json config.json
 ```
 
-编辑 `config.json`，修改服务器信息：
+编辑 `config.json`，修改服务器信息。
+
+**重要：选择以下两种认证方式之一**
+
+#### 选项A：SSH密钥认证（推荐）
 ```json
 {
   "servers": [
@@ -29,7 +33,22 @@ cp config.example.json config.json
 }
 ```
 
-### 3. 配置SSH密钥（推荐）
+#### 选项B：密码认证
+```json
+{
+  "servers": [
+    {
+      "name": "server1",
+      "host": "YOUR_SERVER_IP",
+      "port": 22,
+      "username": "YOUR_USERNAME",
+      "password": "YOUR_PASSWORD"
+    }
+  ]
+}
+```
+
+### 3. 配置SSH密钥（如果选择选项A）
 
 ```bash
 # 生成SSH密钥（如果还没有）

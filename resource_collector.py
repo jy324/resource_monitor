@@ -38,8 +38,10 @@ class ResourceCollector:
             True if connection successful, False otherwise
         
         Note:
-            This uses AutoAddPolicy for host key acceptance. In production,
-            consider using known_hosts file with RejectPolicy for better security.
+            - If password is provided in config, uses password authentication
+            - If password is empty/not provided, uses SSH key authentication (default)
+            - This uses AutoAddPolicy for host key acceptance. In production,
+              consider using known_hosts file with RejectPolicy for better security.
         """
         try:
             self.ssh_client = paramiko.SSHClient()
@@ -52,23 +54,24 @@ class ResourceCollector:
             # For production, consider: paramiko.RejectPolicy() with proper known_hosts
             self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
-            # Try password authentication first, then key-based
-            try:
-                self.ssh_client.connect(
-                    hostname=self.host,
-                    port=self.port,
-                    username=self.username,
-                    password=self.password if self.password else None,
-                    timeout=10
-                )
-            except paramiko.AuthenticationException:
-                # Try with key-based authentication
-                self.ssh_client.connect(
-                    hostname=self.host,
-                    port=self.port,
-                    username=self.username,
-                    timeout=10
-                )
+            # Use password authentication if password is provided, otherwise use SSH keys
+            connect_params = {
+                'hostname': self.host,
+                'port': self.port,
+                'username': self.username,
+                'timeout': 10
+            }
+            
+            # Only add password if it's explicitly provided (not empty)
+            if self.password:
+                connect_params['password'] = self.password
+                logger.debug(f"Connecting to {self.name} using password authentication")
+            else:
+                # When no password, paramiko will automatically try SSH key authentication
+                # It looks for keys in ~/.ssh/ (id_rsa, id_dsa, id_ecdsa, id_ed25519)
+                logger.debug(f"Connecting to {self.name} using SSH key authentication")
+            
+            self.ssh_client.connect(**connect_params)
             
             logger.info(f"Successfully connected to {self.name} ({self.host})")
             return True
