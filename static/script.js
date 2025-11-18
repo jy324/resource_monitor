@@ -101,13 +101,16 @@ function createServerCard(server) {
         if (metrics.cpu !== null && metrics.cpu !== undefined) {
             const cpuLevel = getCpuLevel(metrics.cpu);
             const cpuId = `cpu-${server.name}`;
+            const cpuCollapsed = isCollapsed(cpuId);
+            const cpuIcon = cpuCollapsed ? '▶' : '▼';
+            const cpuClass = cpuCollapsed ? ' collapsed' : '';
             html += `
                 <div class="metric-section collapsible-section">
                     <div class="metric-title collapsible-header" onclick="toggleCollapse('${cpuId}')">
                         <span>💻 CPU 使用率</span>
-                        <span class="collapse-icon">▼</span>
+                        <span class="collapse-icon">${cpuIcon}</span>
                     </div>
-                    <div class="collapsible-content" id="${cpuId}">
+                    <div class="collapsible-content${cpuClass}" id="${cpuId}">
                         <div class="metric-item">
                             <span class="metric-label">当前使用率</span>
                             <span class="metric-value">${metrics.cpu.toFixed(1)}%</span>
@@ -124,13 +127,16 @@ function createServerCard(server) {
         if (metrics.memory) {
             const memLevel = getUsageLevel(metrics.memory.percentage);
             const memId = `mem-${server.name}`;
+            const memCollapsed = isCollapsed(memId);
+            const memIcon = memCollapsed ? '▶' : '▼';
+            const memClass = memCollapsed ? ' collapsed' : '';
             html += `
                 <div class="metric-section collapsible-section">
                     <div class="metric-title collapsible-header" onclick="toggleCollapse('${memId}')">
                         <span>🧠 内存使用</span>
-                        <span class="collapse-icon">▼</span>
+                        <span class="collapse-icon">${memIcon}</span>
                     </div>
-                    <div class="collapsible-content" id="${memId}">
+                    <div class="collapsible-content${memClass}" id="${memId}">
                         <div class="metric-item">
                             <span class="metric-label">已使用</span>
                             <span class="metric-value">${formatMemory(metrics.memory.used_mb)} / ${formatMemory(metrics.memory.total_mb)}</span>
@@ -150,13 +156,16 @@ function createServerCard(server) {
         // GPU
         if (metrics.gpu && metrics.gpu.length > 0) {
             const gpuId = `gpu-${server.name}`;
+            const gpuCollapsed = isCollapsed(gpuId);
+            const gpuIcon = gpuCollapsed ? '▶' : '▼';
+            const gpuClass = gpuCollapsed ? ' collapsed' : '';
             html += `
                 <div class="metric-section collapsible-section">
                     <div class="metric-title collapsible-header" onclick="toggleCollapse('${gpuId}')">
                         <span>🎮 GPU 状态</span>
-                        <span class="collapse-icon">▼</span>
+                        <span class="collapse-icon">${gpuIcon}</span>
                     </div>
-                    <div class="collapsible-content" id="${gpuId}">
+                    <div class="collapsible-content${gpuClass}" id="${gpuId}">
             `;
             metrics.gpu.forEach((gpu, index) => {
                 const gpuLevel = getUsageLevel(gpu.utilization);
@@ -186,13 +195,16 @@ function createServerCard(server) {
     // Disk usage
     if (disk && disk.disk && Object.keys(disk.disk).length > 0) {
         const diskId = `disk-${server.name}`;
+        const diskCollapsed = isCollapsed(diskId);
+        const diskIcon = diskCollapsed ? '▶' : '▼';
+        const diskClass = diskCollapsed ? ' collapsed' : '';
         html += `
             <div class="metric-section collapsible-section">
                 <div class="metric-title collapsible-header" onclick="toggleCollapse('${diskId}')">
                     <span>💾 磁盘使用</span>
-                    <span class="collapse-icon">▼</span>
+                    <span class="collapse-icon">${diskIcon}</span>
                 </div>
-                <div class="collapsible-content" id="${diskId}">
+                <div class="collapsible-content${diskClass}" id="${diskId}">
         `;
         Object.entries(disk.disk).forEach(([path, info]) => {
             if (info) {
@@ -222,27 +234,6 @@ function createServerCard(server) {
     }
     
     card.innerHTML = html;
-    
-    // Restore collapse states from localStorage
-    if (metrics && status === 'connected') {
-        if (metrics.cpu !== null && metrics.cpu !== undefined) {
-            const cpuId = `cpu-${server.name}`;
-            setTimeout(() => restoreCollapseState(cpuId), 0);
-        }
-        if (metrics.memory) {
-            const memId = `mem-${server.name}`;
-            setTimeout(() => restoreCollapseState(memId), 0);
-        }
-        if (metrics.gpu && metrics.gpu.length > 0) {
-            const gpuId = `gpu-${server.name}`;
-            setTimeout(() => restoreCollapseState(gpuId), 0);
-        }
-    }
-    if (disk && disk.disk && Object.keys(disk.disk).length > 0) {
-        const diskId = `disk-${server.name}`;
-        setTimeout(() => restoreCollapseState(diskId), 0);
-    }
-    
     return card;
 }
 
@@ -324,6 +315,12 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => map[m]);
 }
 
+// Check if a section should be collapsed based on localStorage
+function isCollapsed(elementId) {
+    const state = localStorage.getItem(`collapse-${elementId}`);
+    return state === 'collapsed';
+}
+
 // Toggle collapse/expand for metric sections
 function toggleCollapse(elementId) {
     const content = document.getElementById(elementId);
@@ -340,18 +337,5 @@ function toggleCollapse(elementId) {
         icon.textContent = '▶';
         // Save collapsed state
         localStorage.setItem(`collapse-${elementId}`, 'collapsed');
-    }
-}
-
-// Restore collapse state from localStorage
-function restoreCollapseState(elementId) {
-    const state = localStorage.getItem(`collapse-${elementId}`);
-    if (state === 'collapsed') {
-        const content = document.getElementById(elementId);
-        const header = content.previousElementSibling;
-        const icon = header.querySelector('.collapse-icon');
-        
-        content.classList.add('collapsed');
-        icon.textContent = '▶';
     }
 }
