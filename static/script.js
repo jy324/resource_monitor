@@ -222,6 +222,27 @@ function createServerCard(server) {
     }
     
     card.innerHTML = html;
+    
+    // Restore collapse states from localStorage
+    if (metrics && status === 'connected') {
+        if (metrics.cpu !== null && metrics.cpu !== undefined) {
+            const cpuId = `cpu-${server.name}`;
+            setTimeout(() => restoreCollapseState(cpuId), 0);
+        }
+        if (metrics.memory) {
+            const memId = `mem-${server.name}`;
+            setTimeout(() => restoreCollapseState(memId), 0);
+        }
+        if (metrics.gpu && metrics.gpu.length > 0) {
+            const gpuId = `gpu-${server.name}`;
+            setTimeout(() => restoreCollapseState(gpuId), 0);
+        }
+    }
+    if (disk && disk.disk && Object.keys(disk.disk).length > 0) {
+        const diskId = `disk-${server.name}`;
+        setTimeout(() => restoreCollapseState(diskId), 0);
+    }
+    
     return card;
 }
 
@@ -312,7 +333,24 @@ function toggleCollapse(elementId) {
     if (content.classList.contains('collapsed')) {
         content.classList.remove('collapsed');
         icon.textContent = '▼';
+        // Save expanded state
+        localStorage.setItem(`collapse-${elementId}`, 'expanded');
     } else {
+        content.classList.add('collapsed');
+        icon.textContent = '▶';
+        // Save collapsed state
+        localStorage.setItem(`collapse-${elementId}`, 'collapsed');
+    }
+}
+
+// Restore collapse state from localStorage
+function restoreCollapseState(elementId) {
+    const state = localStorage.getItem(`collapse-${elementId}`);
+    if (state === 'collapsed') {
+        const content = document.getElementById(elementId);
+        const header = content.previousElementSibling;
+        const icon = header.querySelector('.collapse-icon');
+        
         content.classList.add('collapsed');
         icon.textContent = '▶';
     }
