@@ -1,24 +1,24 @@
 {
   "servers": [
     {
-      "name": "server1",
-      "host": "192.168.1.101",
+      "name": "a100",
+      "host": "localhost",
       "port": 22,
-      "username": "monitor",
+      "username": "cjy",
       "password": ""
     },
     {
-      "name": "server2",
-      "host": "192.168.1.102",
+      "name": "3090",
+      "host": "server3090",
       "port": 22,
-      "username": "monitor",
+      "username": "cjy",
       "password": ""
     },
     {
-      "name": "server3",
-      "host": "192.168.1.103",
+      "name": "2080",
+      "host": "server2080",
       "port": 22,
-      "username": "monitor",
+      "username": "cjy",
       "password": ""
     }
   ],

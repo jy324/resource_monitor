@@ -95,7 +95,7 @@ function createServerCard(server) {
     `;
     
     if (metrics && status === 'connected') {
-        html += `<div class="server-host">${escapeHtml(metrics.host || '')}</div>`;
+        // html += `<div class="server-host">${escapeHtml(metrics.host || '')}</div>`;
         
         // CPU
         if (metrics.cpu !== null && metrics.cpu !== undefined) {
