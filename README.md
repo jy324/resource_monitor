@@ -43,11 +43,40 @@
             └──────────┘    └──────────┘    └──────────┘
 ```
 
+## 快速开始
+
+### 自动化部署（推荐）
+
+使用自动化脚本快速部署，支持开机自启和虚拟环境管理：
+
+```bash
+# 1. 安装 uv（如果尚未安装）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. 设置虚拟环境和依赖
+./setup_env.sh
+
+# 3. 配置服务器
+cp config.example.json config.json
+nano config.json
+
+# 4. 测试运行
+./start.sh
+
+# 5. 安装为系统服务（开机自启）
+sudo ./install_service.sh
+```
+
+**完整部署文档**: 查看 [DEPLOYMENT.md](DEPLOYMENT.md) 了解详细部署步骤、服务管理和故障排除。
+
+### 手动安装
+
 ## 安装配置
 
 ### 1. 系统要求
 
 - Python 3.7+
+- uv（推荐）或 pip
 - 对目标服务器的SSH访问权限
 - 目标服务器需要安装：
   - Linux操作系统

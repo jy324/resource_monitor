@@ -1,0 +1,30 @@
+[Unit]
+Description=Resource Monitor Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%USER%
+Group=%USER%
+WorkingDirectory=%PROJECT_DIR%
+Environment="PATH=%PROJECT_DIR%/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+
+# Use the virtual environment Python directly
+ExecStartPre=%PROJECT_DIR%/setup_env.sh
+ExecStart=%PROJECT_DIR%/.venv/bin/python %PROJECT_DIR%/main.py
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Resource limits
+LimitNOFILE=65536
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=resource-monitor
+
+[Install]
+WantedBy=multi-user.target
