@@ -6,23 +6,31 @@
       "port": 22,
       "username": "monitor",
       "password": "",
-      "comment": "First server in the pool"
+      "comment": "Standard IP address - First server in the pool"
     },
     {
       "name": "server2",
-      "host": "192.168.1.102",
+      "host": "myserver.local",
       "port": 22,
       "username": "monitor",
       "password": "",
-      "comment": "Second server in the pool"
+      "comment": "Standard hostname - Second server in the pool"
     },
     {
       "name": "server3",
-      "host": "192.168.1.103",
+      "host": "tailscale-server",
       "port": 22,
       "username": "monitor",
       "password": "",
-      "comment": "Third server in the pool"
+      "comment": "Tailscale hostname - Third server (auto-resolved via 'tailscale ip' command)"
+    },
+    {
+      "name": "local-server",
+      "host": "localhost",
+      "port": 22,
+      "username": "monitor",
+      "password": "",
+      "comment": "Local server - monitored directly without SSH"
     }
   ],
   "monitoring": {

@@ -38,9 +38,69 @@ class ResourceCollector:
         if self.is_local:
             logger.info(f"{self.name} detected as local server, will use direct monitoring")
     
+    def _resolve_tailscale_hostname(self, hostname: str) -> Optional[str]:
+        """
+        Resolve a Tailscale hostname to IP address using tailscale CLI.
+        
+        Args:
+            hostname: Tailscale machine name to resolve
+            
+        Returns:
+            IP address string if successful, None otherwise
+        """
+        try:
+            # Try to use tailscale CLI to resolve the hostname
+            result = subprocess.run(
+                ['tailscale', 'ip', hostname],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                ip = result.stdout.strip()
+                if ip:
+                    logger.info(f"Resolved Tailscale hostname '{hostname}' to IP: {ip}")
+                    return ip
+        except FileNotFoundError:
+            # tailscale CLI not installed
+            pass
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Timeout resolving Tailscale hostname: {hostname}")
+        except Exception as e:
+            logger.debug(f"Failed to resolve Tailscale hostname '{hostname}': {e}")
+        
+        return None
+    
+    def _resolve_hostname(self, hostname: str) -> Optional[str]:
+        """
+        Resolve a hostname to IP address. Tries Tailscale first, then falls back to DNS.
+        
+        Args:
+            hostname: Hostname to resolve
+            
+        Returns:
+            IP address string if successful, None otherwise
+        """
+        # Skip resolution for literal IPs
+        if hostname in ['localhost', '127.0.0.1', '::1']:
+            return hostname
+        
+        # Try Tailscale resolution first
+        tailscale_ip = self._resolve_tailscale_hostname(hostname)
+        if tailscale_ip:
+            return tailscale_ip
+        
+        # Fall back to standard DNS
+        try:
+            return socket.gethostbyname(hostname)
+        except socket.gaierror:
+            logger.warning(f"Failed to resolve hostname via DNS: {hostname}")
+            return None
+    
     def _is_local_host(self) -> bool:
         """
         Determine if the configured host is the local machine.
+        Supports Tailscale hostnames.
         
         Returns:
             True if host is local, False otherwise
@@ -62,9 +122,12 @@ class ResourceCollector:
             if self.host == local_fqdn:
                 return True
             
-            # Check if host resolves to a local IP
+            # Check if host resolves to a local IP (with Tailscale support)
             try:
-                host_ip = socket.gethostbyname(self.host)
+                host_ip = self._resolve_hostname(self.host)
+                if not host_ip:
+                    return False
+                    
                 local_ips = [socket.gethostbyname(local_hostname)]
                 # Add all local interface IPs
                 for interface, addrs in psutil.net_if_addrs().items():
@@ -111,9 +174,15 @@ class ResourceCollector:
             # For production, consider: paramiko.RejectPolicy() with proper known_hosts
             self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
+            # Resolve hostname (supports Tailscale hostnames)
+            resolved_host = self._resolve_hostname(self.host)
+            if not resolved_host:
+                logger.error(f"Failed to resolve hostname: {self.host}")
+                return False
+            
             # Use password authentication if password is provided, otherwise use SSH keys
             connect_params = {
-                'hostname': self.host,
+                'hostname': resolved_host,
                 'port': self.port,
                 'username': self.username,
                 'timeout': 10
@@ -130,7 +199,7 @@ class ResourceCollector:
             
             self.ssh_client.connect(**connect_params)
             
-            logger.info(f"Successfully connected to {self.name} ({self.host})")
+            logger.info(f"Successfully connected to {self.name} ({self.host} -> {resolved_host})")
             return True
         except Exception as e:
             logger.error(f"Failed to connect to {self.name} ({self.host}): {e}")

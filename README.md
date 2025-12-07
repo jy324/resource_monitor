@@ -133,6 +133,10 @@ pip install -r requirements.txt
 - `servers`: 服务器列表
   - `name`: 服务器名称（显示在仪表板上）
   - `host`: 服务器IP地址或主机名
+    - 支持标准IP地址：`192.168.1.101`
+    - 支持标准主机名：`myserver.local`
+    - **支持Tailscale主机名**：`server2080`, `server3090` 等
+    - 系统会自动尝试Tailscale解析，如果失败则回退到标准DNS
   - `port`: SSH端口（默认22）
   - `username`: SSH用户名
   - `password`: SSH密码（**可选**）
@@ -231,6 +235,69 @@ ssh monitor@192.168.1.101
 - 更快的数据采集速度
 - 更准确的实时数据
 - 避免SSH认证问题
+
+### 使用Tailscale主机名
+
+系统完全支持Tailscale VPN的主机名。无需配置IP地址，直接使用Tailscale主机名即可。
+
+**前提条件**：
+- 在监控服务器上安装并配置Tailscale
+- 目标服务器也加入同一Tailscale网络
+- Tailscale CLI工具可用（通常随Tailscale安装）
+
+**配置示例（使用Tailscale主机名）**：
+```json
+{
+  "servers": [
+    {
+      "name": "a100",
+      "host": "localhost",
+      "port": 22,
+      "username": "monitor",
+      "password": ""
+    },
+    {
+      "name": "3090",
+      "host": "server3090",
+      "port": 22,
+      "username": "monitor",
+      "password": ""
+    },
+    {
+      "name": "2080",
+      "host": "server2080",
+      "port": 22,
+      "username": "monitor",
+      "password": ""
+    }
+  ]
+}
+```
+
+**工作原理**：
+1. 系统首先尝试使用 `tailscale ip <hostname>` 命令解析主机名
+2. 如果Tailscale解析成功，使用返回的Tailscale IP地址
+3. 如果Tailscale不可用或解析失败，回退到标准DNS解析
+4. 这确保系统在任何环境下都能正常工作
+
+**验证Tailscale连接**：
+```bash
+# 查看Tailscale状态
+tailscale status
+
+# 测试解析主机名
+tailscale ip server2080
+
+# 测试SSH连接
+ssh monitor@server2080
+```
+
+**优势**：
+- 无需记忆或配置IP地址
+- 支持动态IP环境
+- 更好的网络隔离和安全性
+- 自动加密的点对点连接
+- 跨网络访问（无需VPN配置）
 
 ## 使用方法
 
