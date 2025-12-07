@@ -1,0 +1,33 @@
+{
+  "servers": [
+    {
+      "name": "a100",
+      "host": "localhost",
+      "port": 22,
+      "username": "cjy",
+      "password": ""
+    },
+    {
+      "name": "3090",
+      "host": "server3090",
+      "port": 22,
+      "username": "cjy",
+      "password": ""
+    },
+    {
+      "name": "2080",
+      "host": "server2080",
+      "port": 22,
+      "username": "cjy",
+      "password": ""
+    }
+  ],
+  "monitoring": {
+    "resource_check_interval": 300,
+    "disk_check_interval": 28800
+  },
+  "http_server": {
+    "host": "0.0.0.0",
+    "port": 8080
+  }
+}

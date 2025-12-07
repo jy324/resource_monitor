@@ -1,0 +1,46 @@
+{
+  "servers": [
+    {
+      "name": "server1",
+      "host": "192.168.1.101",
+      "port": 22,
+      "username": "monitor",
+      "password": "",
+      "comment": "Standard IP address - First server in the pool"
+    },
+    {
+      "name": "server2",
+      "host": "myserver.local",
+      "port": 22,
+      "username": "monitor",
+      "password": "",
+      "comment": "Standard hostname - Second server in the pool"
+    },
+    {
+      "name": "server3",
+      "host": "tailscale-server",
+      "port": 22,
+      "username": "monitor",
+      "password": "",
+      "comment": "Tailscale hostname - Third server (auto-resolved via 'tailscale ip' command)"
+    },
+    {
+      "name": "local-server",
+      "host": "localhost",
+      "port": 22,
+      "username": "monitor",
+      "password": "",
+      "comment": "Local server - monitored directly without SSH"
+    }
+  ],
+  "monitoring": {
+    "resource_check_interval": 300,
+    "disk_check_interval": 28800,
+    "comment": "resource_check_interval: 300 seconds (5 minutes), disk_check_interval: 28800 seconds (8 hours)"
+  },
+  "http_server": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "comment": "Use 0.0.0.0 to listen on all interfaces, or 127.0.0.1 for localhost only"
+  }
+}
