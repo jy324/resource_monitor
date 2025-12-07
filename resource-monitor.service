@@ -10,8 +10,8 @@ Group=%USER%
 WorkingDirectory=%PROJECT_DIR%
 Environment="PATH=%PROJECT_DIR%/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 
-# Use the virtual environment Python directly
-ExecStartPre=%PROJECT_DIR%/setup_env.sh
+# Use the virtual environment Python directly (no pre-start check)
+# The .venv must be created manually before starting the service using ./setup_env.sh
 ExecStart=%PROJECT_DIR%/.venv/bin/python %PROJECT_DIR%/main.py
 
 # Restart policy

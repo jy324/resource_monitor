@@ -37,14 +37,27 @@ if [ ! -f "${SCRIPT_DIR}/main.py" ]; then
     exit 1
 fi
 
-if [ ! -f "${SCRIPT_DIR}/setup_env.sh" ]; then
-    echo "ERROR: setup_env.sh not found in ${SCRIPT_DIR}"
+# Check if virtual environment exists
+if [ ! -d "${SCRIPT_DIR}/.venv" ] || [ ! -f "${SCRIPT_DIR}/.venv/bin/python" ]; then
+    echo "ERROR: Virtual environment not found or incomplete!"
+    echo ""
+    echo "Please run setup_env.sh first to create the virtual environment:"
+    echo "  cd ${SCRIPT_DIR}"
+    echo "  ./setup_env.sh"
+    echo ""
+    echo "This will:"
+    echo "  1. Create a .venv directory with Python virtual environment"
+    echo "  2. Install all required dependencies"
+    echo ""
     exit 1
 fi
 
+echo "✓ Virtual environment found at ${SCRIPT_DIR}/.venv"
+
 # Make scripts executable
-chmod +x "${SCRIPT_DIR}/setup_env.sh"
-echo "✓ Made setup_env.sh executable"
+if [ -f "${SCRIPT_DIR}/setup_env.sh" ]; then
+    chmod +x "${SCRIPT_DIR}/setup_env.sh"
+fi
 
 # Create service file from template
 echo "Creating systemd service file..."

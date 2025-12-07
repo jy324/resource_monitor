@@ -53,15 +53,20 @@ nano config.json  # 或使用你喜欢的编辑器
 
 ### 5. 安装为系统服务（开机自启）
 
+**重要：** 安装服务前必须先运行 `./setup_env.sh` 创建虚拟环境！
+
 ```bash
 sudo ./install_service.sh
 ```
 
 安装脚本会：
+- 检查 .venv 虚拟环境是否存在
 - 自动检测当前用户
 - 创建 systemd 服务文件
 - 启用开机自动启动
 - 提示是否立即启动服务
+
+**注意：** 如果看到 "Virtual environment not found" 错误，请先运行 `./setup_env.sh`
 
 ## 服务管理
 
