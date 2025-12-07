@@ -46,7 +46,7 @@ class ResourceCollector:
             hostname: Tailscale machine name to resolve
             
         Returns:
-            IP address string if successful, None otherwise
+            IPv4 address string if successful, None otherwise
         """
         try:
             # Try to use tailscale CLI to resolve the hostname
@@ -57,10 +57,14 @@ class ResourceCollector:
                 timeout=5
             )
             if result.returncode == 0:
-                ip = result.stdout.strip()
-                if ip:
-                    logger.info(f"Resolved Tailscale hostname '{hostname}' to IP: {ip}")
-                    return ip
+                # tailscale ip returns multiple lines (IPv4 and IPv6)
+                # We only want the IPv4 address (first line, starts with 100.x.x.x)
+                lines = result.stdout.strip().split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line and not ':' in line:  # IPv4 doesn't contain ':'
+                        logger.info(f"Resolved Tailscale hostname '{hostname}' to IP: {line}")
+                        return line
         except FileNotFoundError:
             # tailscale CLI not installed
             pass
